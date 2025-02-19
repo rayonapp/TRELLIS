@@ -440,24 +440,24 @@ def to_glb(
     vertices, faces, uvs = parametrize_mesh(vertices, faces)
 
     # bake texture
-    observations, extrinsics, intrinsics = render_multiview(app_rep, resolution=1024, nviews=100)
-    masks = [np.any(observation > 0, axis=-1) for observation in observations]
-    extrinsics = [extrinsics[i].cpu().numpy() for i in range(len(extrinsics))]
-    intrinsics = [intrinsics[i].cpu().numpy() for i in range(len(intrinsics))]
-    texture = bake_texture(
-        vertices, faces, uvs,
-        observations, masks, extrinsics, intrinsics,
-        texture_size=texture_size, mode='opt',
-        lambda_tv=0.01,
-        verbose=verbose
-    )
-    texture = Image.fromarray(texture)
+    # observations, extrinsics, intrinsics = render_multiview(app_rep, resolution=1024, nviews=100)
+    # masks = [np.any(observation > 0, axis=-1) for observation in observations]
+    # extrinsics = [extrinsics[i].cpu().numpy() for i in range(len(extrinsics))]
+    # intrinsics = [intrinsics[i].cpu().numpy() for i in range(len(intrinsics))]
+    # texture = bake_texture(
+    #     vertices, faces, uvs,
+    #     observations, masks, extrinsics, intrinsics,
+    #     texture_size=texture_size, mode='opt',
+    #     lambda_tv=0.01,
+    #     verbose=verbose
+    # )
+    # texture = Image.fromarray(texture)
 
     # rotate mesh (from z-up to y-up)
     vertices = vertices @ np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
     material = trimesh.visual.material.PBRMaterial(
         roughnessFactor=1.0,
-        baseColorTexture=texture,
+        #baseColorTexture=texture,
         baseColorFactor=np.array([255, 255, 255, 255], dtype=np.uint8)
     )
     mesh = trimesh.Trimesh(vertices, faces, visual=trimesh.visual.TextureVisuals(uv=uvs, material=material))
