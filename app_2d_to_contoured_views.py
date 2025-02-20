@@ -84,17 +84,17 @@ def img_to_contours(img_path: str) -> Image.Image:
     # upper = int(min(255, (1.0 + sigma) * v))
 
     edges = cv2.Canny(image, 0, 255)  # lower, upper)
-
+    return Image.fromarray(255-edges)
     # Find contours
-    logging.info("Finding contours...")
-    contours, *_ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    #logging.info("Finding contours...")
+    #contours, *_ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # this will locate the outside contour only (too minimalist for our use case)
 
-    contour_image = np.zeros_like(image)
-    cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
+    #contour_image = np.zeros_like(image)
+    #cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
 
-    contour_image = 255 - contour_image
+    #contour_image = 255 - contour_image
 
-    return Image.fromarray(contour_image)
+    #return Image.fromarray(contour_image)
 
 
 if __name__ == "__main__":
