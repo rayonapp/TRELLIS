@@ -1,8 +1,10 @@
 """Gradio app to demo a 2d input image > views (as contours) output
 
-Note this will require installing TRELLI and its dependencies which can be a bit of a pain"""
+Note this will require installing TRELLI and its dependencies which can be a bit of a pain
+"""
 
 import logging
+import math
 import os
 
 os.environ["ATTN_BACKEND"] = (
@@ -49,7 +51,7 @@ def get_three_views(image: np.ndarray) -> list[str]:
             image["color"][ind]
         )  # ind: 0 is behind, 1 is left side, 2 is front, 3 is right side
         img.save(f"2d_image_color_{views[ind]}.png")
-        contour_image = img_to_contours(f"2d_image_color_{views[ind]}.png")
+        contour_image = img_to_block_outline(f"2d_image_color_{views[ind]}.png")
         contour_image.save(f"contour_2d_image_color_{views[ind]}.png")
         out_paths.append(f"contour_2d_image_color_{views[ind]}.png")
 
@@ -62,39 +64,58 @@ def get_three_views(image: np.ndarray) -> list[str]:
         image["color"][0]
     )  # ind: 0 is behind, 1 is left side, 2 is front, 3 is right side
     img.save(f"2d_image_color_{views[0]}.png")
-    contour_image = img_to_contours(f"2d_image_color_{views[0]}.png")
+    contour_image = img_to_block_outline(f"2d_image_color_{views[0]}.png")
     contour_image.save(f"contour_2d_image_color_{views[0]}.png")
     out_paths.append(f"contour_2d_image_color_{views[0]}.png")
 
     return out_paths
 
 
-def img_to_contours(img_path: str) -> Image.Image:
+def img_to_block_outline(
+    img_path: str, blur_kernel_size: tuple = (5, 5), sigma: float = 0.33
+) -> Image.Image:
+    """Convert an image to a black and white raster block outline
+
+    Args:
+        img_path (str): path to the 2d view from the 3d model to process
+        blur_kernel_size (tuple, optional): _description_. Defaults to (5, 5).
+        sigma (float, optional): _description_. Defaults to 0.33.
+
+    Returns:
+        Image.Image: the block outline image
+    """
+    if blur_kernel_size[0] % 2 == 0 or blur_kernel_size[1] % 2 == 0:
+        raise ValueError("Blur kernel size must be odd")  # raise or correct the value?
     # Load the image
     image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
     # Gaussian filter
-    image = cv2.GaussianBlur(image, (5, 5), 0)
+    image = cv2.GaussianBlur(image, blur_kernel_size, 0)
 
     # find good canny thresholds
-    # logging.info("Finding good Canny thresholds...")
-    # v = np.median(image)
-    # sigma = 0.75  # I don't want all the little details
-    # lower = int(max(0, (1.0 - sigma) * v))
-    # upper = int(min(255, (1.0 + sigma) * v))
+    logging.info("Finding good Canny thresholds...")
+    v = np.median(image)
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
 
-    edges = cv2.Canny(image, 0, 255)  # lower, upper)
-    return Image.fromarray(255-edges)
+    edges = cv2.Canny(image, lower, upper)
+
     # Find contours
-    #logging.info("Finding contours...")
-    #contours, *_ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # this will locate the outside contour only (too minimalist for our use case)
+    logging.info("Finding contours and retaining only the longest ones...")
+    contours, *_ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    #contour_image = np.zeros_like(image)
-    #cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 1)
+    # Filter and sort contours by length, keep only the longest (to remove little irrelevant edges for a block)
+    top_n = math.ceil(
+        0.1
+        * len(
+            contours
+        )  # 0.1 is empirical; it depends on the quality of the backgroud remover (the better, the less top contours needed) and on the curvature of the object (the more curved, the more top contours needed)
+    )  # ceil is in the edge case where there is one single contour eg top of a table
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:top_n]
+    contour_image = np.ones_like(image) * 255
+    cv2.drawContours(contour_image, contours, -1, color=(0, 0, 0), thickness=1)
 
-    #contour_image = 255 - contour_image
-
-    #return Image.fromarray(contour_image)
+    return Image.fromarray(contour_image)
 
 
 if __name__ == "__main__":
@@ -106,6 +127,7 @@ if __name__ == "__main__":
     pipeline.cuda()
     demo = gr.Interface(
         fn=get_three_views,
+        live=True,
         inputs=[
             gr.Image(),
         ],
