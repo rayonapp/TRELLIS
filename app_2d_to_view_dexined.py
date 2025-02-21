@@ -1,7 +1,9 @@
-"""Gradio app to demo a 2d input image > views (as b&w contours) output
+"""Gradio app to demo a 2d input image > views (as b&w contours) SVG output
 
-Note this will require installing TRELLI (https://github.com/rayonapp/TRELLIS) and its dependencies which can be a bit of a pain
-This also requires the DexiNED repo (https://github.com/xavysp/DexiNed)
+It requires installing:
+- TRELLI (https://github.com/rayonapp/TRELLIS) and its dependencies which can be a bit of a pain => 2d to 3d model
+- DexiNED repo (https://github.com/xavysp/DexiNed) => CNN for edge detection
+- Deep Sketch (https://github.com/Nauhcnay/Deep-Sketch-Vectorization) with all their dependencies
 """
 
 import logging
@@ -32,6 +34,7 @@ def get_three_views(image: np.ndarray | None) -> list[str]: # None is because li
     Returns:
         list[str]: the paths to the 2d views saved on disk
     """
+    os.chdir("/workspace/TRELLIS")
     image_pil = Image.fromarray(image)
     out_paths = ["rembg_output.png"]  # this is the input to the 3d-conversion model
     outputs = pipeline.run(
@@ -68,15 +71,15 @@ def get_three_views(image: np.ndarray | None) -> list[str]: # None is because li
 
     os.chdir("/workspace/DexiNed")
     os.system("python main.py")
+    
+    os.chdir("/workspace/Deep-Sketch-Vectorization")
+    os.system("rm /workspace/Deep-Sketch-Vectorization/outputs_clem/* -rf")
+    logging.info("Running Deep-Sketch-Vectorization on the images...")
+    os.system("python predict_s1.py --input /workspace/DexiNed/result/BIPED2CLASSIC/fused  --output ./outputs_clem --refine --rdp")
+    
     out_paths.extend(
-        [
-            filename
-            for filename in Path(
-                "/workspace/DexiNed/result/BIPED2CLASSIC/fused"
-            ).iterdir()
-            if filename.is_file() and filename.suffix == ".png"
-        ]
-    )
+        [str(svg) for svg in Path("/workspace/Deep-Sketch-Vectorization/outputs_clem/svg_full").glob("*final.svg")])
+    
     os.chdir("/workspace/TRELLIS")
 
     return out_paths
